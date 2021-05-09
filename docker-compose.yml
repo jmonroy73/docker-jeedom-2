@@ -1,10 +1,5 @@
 ﻿version: '2'
 
-#networks:
-#    default:
-#        external:
-#             name: local_net
-
 services:
 
     jeedom:
@@ -14,16 +9,16 @@ services:
         pid: "host"
         cap_add:
              - SYS_PTRACE
-        # tty: true
+        tty: true
         hostname: jeedom
         #mac_address: a0:ca:ab:cd:ef:02
         #networks:
         #     default:
         #        ipv4_address: 192.168.1.11
-        # devices:
+        devices:
         #     - "/dev/ttyUSB0"
         #     - "/dev/ttyUSB1"
-        #     - "/dev/ttyACM0"
+          - "/dev/ttyACM0"
         restart: unless-stopped
         volumes:
           - ./backup:/var/www/html/backup
@@ -55,3 +50,45 @@ services:
         image: adminer
         ports:
             - "8080:8080"
+
+
+    mqtt-master:
+        image: eclipse-mosquitto
+        container_name: mqtt-master
+        ports:
+        - 1883:1883 #Uniquement si besoin d'avoir le port exposé
+        restart: unless-stopped
+        healthcheck:
+          test: "mosquitto_sub -t '$$SYS/#' -C 1 | grep -v Error || exit 1"
+          interval: 5s
+          timeout: 5s
+          retries: 3
+
+    # La configuration dans zwave2mqtt sera le nom du service docker
+    zwave2mqtt:
+        image: zwavejs/zwavejs2mqtt
+        container_name: zwave2mqtt
+        ports:
+        - 8091:8091 #Uniquement si besoin d'avoir le port exposé. Si seul le mqtt utilise ce service, l'exposition n'est pas utile, on passe par le sous réseau docker "mqtt"
+        volumes:
+        - ./zwave2mqtt:/usr/src/app/store  # remplacer /nfs/volumes par l'emplacement du volume souhaité
+        restart: unless-stopped
+        devices:
+        - /dev/ttyACM0
+
+    # On peux ajouter également Node-red. permettant une gestion de mqtt native
+    node-red:
+        image:  nodered/node-red
+        container_name: node-red
+        volumes:
+        - ./nodered:/data  # remplacer /nfs/volumes par l'emplacement du volume souhaité
+        healthcheck:
+          test:
+          - CMD
+          - curl
+          - -f
+          - http://localhost:1880
+          interval: 1m
+          timeout: 10s
+          retries: 3
+          start_period: 10s

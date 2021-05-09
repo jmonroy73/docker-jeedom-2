@@ -25,6 +25,7 @@ RUN apt-get update && apt-get install -y \
 	libzip-dev zip \
 	git \
 	mariadb-client \
+	smbclient \
 	systemd gettext librsync-dev \
 	sudo && \
 # add php extension
