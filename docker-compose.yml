@@ -22,7 +22,7 @@ services:
 
 
   db:
-    image: ghcr.io/linuxserver/mariadb # 'jc21/mariadb-aria:latest'
+    image: 'jc21/mariadb-aria:latest'
     restart: unless-stopped
     environment:
       MYSQL_ROOT_PASSWORD: 'admin'

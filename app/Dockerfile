@@ -1,8 +1,8 @@
 # download jeedom source from github
-FROM alpine
+FROM alpine/git
 
 # version jeedom: master ou release=v3, V4-stable
-RUN apk update && apk add --no-cache git
+# RUN apk update && apk add --no-cache git
 
 WORKDIR /app
 VOLUME /app
