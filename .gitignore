@@ -1,2 +1,4 @@
 ﻿.env
 certbot/.ovhapi
+data/
+password

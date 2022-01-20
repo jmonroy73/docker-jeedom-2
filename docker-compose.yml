@@ -18,7 +18,7 @@ services:
       DB_MYSQL_NAME: "npm"
     volumes:
       - ./data/nginx:/data
-      - ./letsencrypt:/etc/letsencrypt
+      - ./data/letsencrypt:/etc/letsencrypt
 
 
   db:
@@ -123,9 +123,13 @@ services:
     image: eclipse-mosquitto
     ports:
       - 1883:1883 #Uniquement si besoin d'avoir le port exposé
+    volumes:
+      - ./mosquitto:/mosquitto/config
+      - ./data/mosquitto/log:/mosquitto/log
+      - ./data/mosquitto/data:/mosquitto/data
     restart: unless-stopped
     healthcheck:
       test: "mosquitto_sub -t '$$SYS/#' -C 1 | grep -v Error || exit 1"
-      interval: 5s
+      interval: 15s
       timeout: 5s
       retries: 3
