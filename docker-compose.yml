@@ -78,9 +78,9 @@ services:
       timeout: 20s
 
 
-  # Scheduler Service
+  # Scheduler Service: mcuadros/ofelia or premoweb/chadburn
   scheduler:
-    image: ofelia
+    image: premoweb/chadburn
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./ofelia.ini:/etc/ofelia/config.ini
@@ -117,6 +117,7 @@ services:
       - "/dev/ttyACM0"
     volumes:
       - ./data/zwave:/usr/src/app/store
+    restart: unless-stopped
 
 
   mqtt:
