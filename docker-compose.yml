@@ -129,8 +129,3 @@ services:
       - ./data/mosquitto/log:/mosquitto/log
       - ./data/mosquitto/data:/mosquitto/data
     restart: unless-stopped
-    healthcheck:
-      test: "mosquitto_sub -t '$$SYS/#' -C 1 | grep -v Error || exit 1"
-      interval: 15s
-      timeout: 5s
-      retries: 3
