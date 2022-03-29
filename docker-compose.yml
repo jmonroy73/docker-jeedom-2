@@ -4,7 +4,7 @@ version: '2.3'
 services:
 
   nginx:
-    image: 'jc21/nginx-proxy-manager:latest'
+    image: jc21/nginx-proxy-manager:2.8.1
     restart: unless-stopped
     ports:
       - '80:80'
@@ -22,13 +22,10 @@ services:
 
 
   db:
-    image: 'jc21/mariadb-aria:latest'
+    image: yobasystems/alpine-mariadb:latest
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: 'admin'
-      MYSQL_DATABASE: 'npm'
-      MYSQL_USER: 'npm'
-      MYSQL_PASSWORD: 'npm'
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
     healthcheck:
       test: ["CMD", "mysqladmin" ,"ping", "-h", "localhost"]
       interval: 1m30s
@@ -39,43 +36,32 @@ services:
       - ./data/mysql:/var/lib/mysql
 
 
-  # git clone of jeedom source
-  installing:
-    build: ./app
-    volumes:
-      - ./jeedom:/app
-
-
   jeedom:
     build: ./php
-    privileged: false
-    pid: "host"
     environment:
-      - TZ=Europe/Paris
-    cap_add:
-      - SYS_PTRACE
-    # tty: true
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - MYSQL_JEEDOM_DATABASE=${MYSQL_DATABASE}
+      - MYSQL_JEEDOM_USER=${MYSQL_USER}
+      - MYSQL_JEEDOM_PASSWD=${MYSQL_PASSWORD}
+      - JEEDOM_BRANCH=beta
+      - MYSQL_HOST=db
+      - TZ=${TIME_ZONE}
     hostname: jeedom
-    #mac_address: a0:ca:ab:cd:ef:02
-    #networks:
-    #     default:
-    #        ipv4_address: 192.168.1.11
-    # devices:
-    #     - "/dev/ttyUSB0"
-    #     - "/dev/ttyUSB1"
-    #     - "/dev/ttyACM0"
     restart: unless-stopped
     volumes:
       - ./jeedom:/var/www/html
-      - ./backup:/var/www/html/backup
-    depends_on:
-      - installing
+      - ./backup:/tmp/backup
     healthcheck:
-      test: ["CMD-SHELL", "curl -so /tmp/status http://nginx/status || exit 1"]
+      test: ["CMD-SHELL", "curl -so /tmp/status http://localhost/here.html || exit 1"]
       interval: 1m30s
       retries: 3
       start_period: 40s
       timeout: 20s
+    labels:
+      # label chadburn for the "cron" container
+      chadburn.enabled: "true"
+      chadburn.job-exec.jeedom-cron.schedule: "@every 1m"
+      chadburn.job-exec.jeedom-cron.command: "/usr/local/bin/php /var/www/html/core/php/jeeCron.php >> /var/www/html/log/cron.log 2>&1"
 
 
   # Scheduler Service: mcuadros/ofelia or premoweb/chadburn
@@ -83,7 +69,6 @@ services:
     image: premoweb/chadburn
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ./ofelia.ini:/etc/ofelia/config.ini
     depends_on:
       - jeedom
 

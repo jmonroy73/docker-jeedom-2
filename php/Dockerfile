@@ -1,9 +1,14 @@
-﻿# choix de la version debian:
-# stretch = debian 9 (les box smart & co)
-# buster = debian 10 (les DIY)
-FROM php:7.3-apache-buster
+﻿FROM php:7.3-apache-buster
 
-LABEL version="jeedom for debian buster"
+ENV JEEDOM_BRANCH=beta
+ENV MYSQL_JEEDOM_DATABASE=jeedom
+ENV MYSQL_JEEDOM_USER=jeedom
+# ENV MYSQL_JEEDOM_PASSWD
+# ENV MYSQL_ROOT_PASSWORD
+ENV MYSQL_HOST=db
+ENV JEEDOM_BRANCH=beta
+
+LABEL version="Jeedom for Docker"
 
 # Installation des paquets
 # 	ccze          : couleur pour les logs
@@ -15,19 +20,33 @@ LABEL version="jeedom for debian buster"
 
 RUN apt-get update && apt-get install -y \
 	apt-utils \
+	net-tools \
 	wget \
 	ntp \
 	locales \
 	ccze \
-	cron \
 	python python-pip python3 python-dev python3-pip python-virtualenv \
 	libzip-dev zip \
 	git \
 	mariadb-client \
-	systemd gettext librsync-dev \
-	sudo && \
+	gettext librsync-dev \
+	sudo at \
+  libssh2-1 libssh2-1-dev
+
+# libc-client-dev libkrb5-dev : for imap extension
+# libc-client2007e-dev libpng-dev : for gd extension
+# libxml2-dev : xmlrpc extension
+# libldb-dev libldap2-dev : ldap extension
+RUN apt install -y libc-client-dev libkrb5-dev libxml2-dev \
+     libc-client2007e-dev libldb-dev libldap2-dev  libpng-dev && \
+  rm -r /var/lib/apt/lists/*
+  
 # add php extension
-    docker-php-ext-install pdo pdo_mysql zip && \
+RUN pecl install ssh2-1.3.1
+RUN docker-php-ext-enable ssh2
+RUN docker-php-ext-configure imap --with-kerberos --with-imap-ssl
+RUN docker-php-ext-configure ldap # --with-libdir=lib/x86_64-linux-gnu/
+RUN docker-php-ext-install sockets pdo pdo_mysql zip gd imap opcache xmlrpc ldap && \
 # add sudo for www-data
     echo "www-data ALL=(ALL:ALL) NOPASSWD: ALL" > /etc/sudoers.d/90-mysudoers
 
@@ -40,29 +59,30 @@ RUN python -m pip install future fasteners && \
 	rm -rf /tmp/duplicity.tar.gz && \
 	rm -rf duplicity-0.7.19
 
-COPY php.ini /usr/local/etc/php/php.ini
-COPY www.conf /usr/local/etc/php-fpm.d/www.conf
+# install composer for dependancies
+# COPY --from=composer:latest /usr/bin/composer /usr/local/bin/composer
+# RUN composer install
 
-# volume for jeedom core github source	
+#add motd - link sh to bash for Docker Desktop
+COPY motd /etc/jmotd
+RUN echo '[ ! -z "$TERM" -a -r /etc/motd ] && cat /etc/issue && cat /etc/motd && cat /etc/jmotd' \
+    >> /etc/bash.bashrc && \
+	ln -sf /bin/bash /bin/sh
+
+RUN cp /usr/local/etc/php/php.ini-development /usr/local/etc/php/php.ini
+
+# Change uid and gid of apache to docker user uid/gid - create /tmp/jeedom
+RUN usermod -u 1000 www-data \
+   && groupmod -g 1000 www-data \
+   && mkdir -p /tmp/jeedom \
+   && chmod 777 -R /tmp/jeedom \
+   && chown www-data:www-data -R /tmp/jeedom
+
 WORKDIR /var/www/html
-VOLUME /var/www/html
-
-# volume for backup
-VOLUME /var/www/html/backup
-
-# Create the log file to be able to run tail
-RUN mkdir /var/www/html/log && \
-    touch /var/www/html/log/cron.log
+VOLUME  /var/www/html
 
 # Initialisation 
-# ADD install/OS_specific/Docker/init.sh /root/init.sh
-# RUN chmod +x /root/init.sh
-# CMD ["sh", "/root/init.sh"]
+ADD init.sh /root/init.sh
+RUN chmod +x /root/init.sh
+ENTRYPOINT ["/root/init.sh"]
 
-#   prepare db config file:
-#   mv /app/core/config/common.config.sample.php /app/core/config/common.config.php && \
-#   sed -ri -e 's!#HOST#!db!g' /app/core/config/common.config.php  && \
-#   sed -ri -e 's!#PORT#!3306!g' /app/core/config/common.config.php  && \
-#   sed -ri -e 's!#DBNAME#!jeedom!g' /app/core/config/common.config.php  && \
-#   sed -ri -e 's!#USERNAME#!jeedom!g' /app/core/config/common.config.php  && \
-#   sed -ri -e 's!#PASSWORD#!jeedom!g' /app/core/config/common.config.php
